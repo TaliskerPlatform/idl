@@ -1,33 +1,17 @@
 %{
-/* COM IDL Compiler
- * @(#) $Id$
- */
-
-/*
- * Copyright (c) 2008 Mo McRoberts.
+/* Copyright (c) 2008-2015 Mo McRoberts.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The names of the author(s) of this software may not be used to endorse
- *    or promote products derived from this software without specific prior
- *    written permission.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, 
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
- * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL
- * AUTHORS OF THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 /*
@@ -142,6 +126,7 @@ yyerror(void *scanner, char *s)
 %token HANDLE_T_KW
 %token HYPER_KW
 
+%token ID_KW
 %token IDEMPOTENT_KW
 %token IGNORE_KW
 %token IID_IS_KW
@@ -290,6 +275,17 @@ interface:
 		interface_init interface_start interface_ancestor interface_tail
 		{
 			idl_intf_done(curmod->curintf);
+			idl_module_scope_pop(curmod);
+		}
+    |   INTERFACE_KW identifier SEMI
+	    {
+			if(!idl_intf_lookup($1))
+			{
+				idl_interface_t *p;
+
+				p = idl_intf_stub(curmod, $1);
+				p->type = BLOCK_INTERFACE;
+			}
 		}
 	;
 
@@ -297,6 +293,7 @@ interface_start:
 		interface_attributes INTERFACE_KW identifier
 		{
 			curmod->curintf->type = BLOCK_INTERFACE;
+			/* TODO: name clashes */
 			idl_intf_name(curmod->curintf, $3);
 			idl_intf_started(curmod->curintf);
 		}
@@ -317,6 +314,8 @@ identifier:
 	|	IN_KW { $$ = $1; }
 	|	OUT_KW { $$ = $1; }
 	|	INOUT_KW { $$ = $1; }
+    |   ID_KW { $$ = $1; }
+    |   PTR_KW { $$ = $1; }
 	;
 
 interface_ancestor:
@@ -325,14 +324,19 @@ interface_ancestor:
 		{
 			if(NULL == (curmod->curintf->ancestor = idl_intf_lookup($2)))
 			{
-				idl_module_error(curmod, yyget_lineno(scanner), "cannot derive %s from undefined interface %s", curmod->curintf->name, $2);
+				curmod->curintf->ancestor = idl_intf_stub(curmod, $2);
+/*				idl_module_error(curmod, yyget_lineno(scanner), "cannot derive %s from undefined interface %s", curmod->curintf->name, $2); */
 			}
 		}
 	;
 
 interface_init:
 		{
+			idl_scope_t *scope;
+
 			idl_intf_create(curmod);
+			scope = idl_module_scope_push(curmod);
+			scope->type = ST_CONTAINER;
 		}
 	;
 
@@ -400,6 +404,13 @@ interface_attr:
 			char *dummy;
 			
 			curmod->curintf->version = strtoul($3, &dummy, 0);
+			$$ = $3;
+        }
+   |   ID_KW LPAREN INTEGER_NUMERIC RPAREN
+        {
+			char *dummy;
+			
+			curmod->curintf->id = strtoul($3, &dummy, 0);
 			$$ = $3;
         }
     |   LOCAL_KW
@@ -568,7 +579,7 @@ typedef_decl:
 		TYPEDEF_KW typedef_init type_decl pointer_ident_decl_list SEMI
 		{
 			idl_module_typedecl_pop(curmod);
-			idl_intf_write_typedef(curmod->curintf, curmod->curintf->firstsym);
+/*			idl_intf_write_typedef(curmod->curintf, curmod->curintf->firstsym); */
 			curmod->curintf->firstsym = NULL;
 		}
 	;
@@ -577,6 +588,7 @@ const_decl:
 		CONST_KW const_init const_type simple_declarator EQUAL const_value SEMI
 		{
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
+			idl_module_scope_pop(curmod);
 		}
 	;
 
@@ -591,7 +603,8 @@ struct_decl:
 			curmod->cursym->type = SYM_STRUCT;
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
 			idl_module_typedecl_pop(curmod);
-			idl_intf_write_type(curmod->curintf, sym->decl);
+			idl_module_scope_pop(curmod);
+/*			idl_intf_write_type(curmod->curintf, sym->decl); */
 		}
 	;
 
@@ -630,10 +643,12 @@ method_decl:
 		method_attributes type_decl method_init LPAREN fp_args_init possible_arg_list RPAREN SEMI
 		{
 			idl_symdef_t *fn;
-			
+
 			idl_intf_symlist_pop(curmod->curintf, curmod->cursymlist);
 			fn = curmod->cursymlist->defs[curmod->cursymlist->ndefs - 1];
-			idl_intf_write_method(curmod->curintf, fn);
+			curmod->cur->symdef = fn;
+			idl_module_scope_pop(curmod);
+/*			idl_intf_write_method(curmod->curintf, fn); */
 		}
 	;
 	
@@ -649,8 +664,20 @@ method_attr_list:
     ;
 
 method_attr:
-	|	CALL_AS_KW
+	|	CALL_AS_KW LPAREN identifier RPAREN
+        {
+			/* Don't emit a vtable entry for this method; clients will
+			 * use (identifier) instead.
+			 */
+        }
 	|	LOCAL_KW
+        {
+			/* No stubs will be generated for this method */
+        }
+    |   ID_KW LPAREN INTEGER_NUMERIC RPAREN
+        {
+			/* Set the numeric RPC identifier for this method */
+        }
 	;
 	
 	
@@ -667,9 +694,13 @@ method_init:
 
 methodspec_begin:
 		{
+			idl_scope_t *scope;
+			
 			curmod->cursymlist->symtype = SYM_METHOD;
 			idl_intf_symdef_create(curmod->curintf, curmod->curtype);
 			curmod->cursym->local = curmod->curintf->local;
+			scope = idl_module_scope_push(curmod);
+			scope->type = ST_SYMDEF;
 		}
 
 typedef_init:
@@ -692,6 +723,7 @@ pointer_ident_decl:
 				idl_module_error(curmod, yyget_lineno(scanner), "Symbol '%s' was declared as a function pointer but no arguments have been specified", curmod->cursym->ident);
 			}
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
+			idl_module_scope_pop(curmod);
 		}
 	;
 	
@@ -709,6 +741,7 @@ pointer_ident_decl_list:
 			}
 			curmod->curintf->firstsym = curmod->cursym;
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
+			idl_module_scope_pop(curmod);
 		}
 	|	pointer_ident_decl_list COMMA symdef_init declarator LPAREN fp_args_init_link possible_arg_list RPAREN possible_array
 		{
@@ -722,6 +755,7 @@ pointer_ident_decl_list:
 			}
 			idl_intf_symdef_link(curmod->curintf, curmod->cursym);
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
+			idl_module_scope_pop(curmod);
 		}
 	|	error
 		{
@@ -800,6 +834,7 @@ fp_args_init:
 			fp->fp_params.symtype = SYM_PARAM;
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
 			idl_intf_symlist_push(curmod->curintf, &(fp->fp_params));
+			idl_module_scope_pop(curmod);
 		}
 	;
 
@@ -816,6 +851,7 @@ fp_args_init_first:
 			fp->fp_params.symtype = SYM_PARAM;
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
 			idl_intf_symlist_push(curmod->curintf, &(fp->fp_params));
+			idl_module_scope_pop(curmod);
 		}
 	;
 	
@@ -832,6 +868,7 @@ fp_args_init_link:
 			idl_intf_symdef_link(curmod->curintf, curmod->cursym);
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
 			idl_intf_symlist_push(curmod->curintf, &(fp->fp_params));
+			idl_module_scope_pop(curmod);
 		}
 	;
 
@@ -871,7 +908,11 @@ typedecl_init:
 
 symdef_init:
 		{
+			idl_scope_t *scope;
+
 			idl_intf_symdef_create(curmod->curintf, curmod->curtype);
+			scope = idl_module_scope_push(curmod);
+			scope->type = ST_SYMDEF;
 		}
 	;
 
@@ -1118,19 +1159,26 @@ enum_member:
 			curmod->cursym->decl = NULL;
 			curmod->cursym->constval = (idl_expr_t *) $4;
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
+			idl_module_scope_pop(curmod);
 		}
 	|	symdef_init simple_declarator
 		{
 			curmod->cursym->decl = NULL;
 			curmod->cursym->noval = 1;
 			idl_intf_symdef_done(curmod->curintf, curmod->cursym);
+			idl_module_scope_pop(curmod);
 		}
 	;
 	
 cpp_quote:
 		CPP_QUOTE_KW LPAREN STRING RPAREN extraneous_semi
 		{
-			idl_emit_cppquote(curmod, $3);
+			idl_scope_t *scope;
+
+			scope = idl_module_scope_push(curmod);
+			scope->type = ST_QUOTE;
+			scope->text = strdup($3);
+			idl_module_scope_pop(curmod);
 		}
 	;
 

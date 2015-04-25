@@ -20,7 +20,7 @@ libtool
 .libs
 Makefile.in
 Makefile
-comidl
+/idl
 *.la
 *.o
 *.lo
@@ -33,3 +33,4 @@ lexidl.c
 a.out
 a.out.*
 ylwrap
+/temp

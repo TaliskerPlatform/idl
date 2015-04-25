@@ -1,33 +1,16 @@
-/*
- * COM IDL Compiler
- * @(#) $Id$
- */
-
-/*
- * Copyright (c) 2008 Mo McRoberts.
+/* Copyright (c) 2008-2015 Mo McRoberts.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The names of the author(s) of this software may not be used to endorse
- *    or promote products derived from this software without specific prior
- *    written permission.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, 
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
- * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL
- * AUTHORS OF THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -51,15 +34,76 @@ idl_intf_create(idl_module_t *module)
 }
 
 idl_interface_t *
+idl_intf_stub(idl_module_t *module, const char *name)
+{
+	idl_interface_t *p;
+	idl_typedecl_t *typedecl;
+	idl_symdef_t *sym;
+	
+	if(NULL == (p = (idl_interface_t *) calloc(1, sizeof(idl_interface_t))))
+	{
+		return NULL;
+	}
+	p->cursymlist = &(p->symlist);
+	p->stub = 1;
+	idl_module_addintf(module, p);
+	idl_intf_name(p, name);
+	typedecl = idl_module_typedecl_push(module);
+	typedecl->builtin_type = TYPE_INTERFACE;
+	sym = idl_module_symdef_create(module, &(p->symlist), typedecl);
+	sym->type = SYM_TYPEDEF;
+	strcpy(sym->ident, p->name);
+	idl_module_symdef_add(module, &(p->symlist), sym);
+	idl_module_typedecl_pop(module);
+	fprintf(stderr, "added stub '%s'\n", name);
+	return p;
+}
+
+idl_interface_t *
 idl_intf_lookup(const char *name)
 {
-	return idl_module_lookupintf(name);
+	return idl_module_lookupintf(name, 1);
 }
 
 int
 idl_intf_done(idl_interface_t *intf)
 {
 	return idl_module_doneintf(intf->module, intf);
+}
+
+int
+idl_intf_resolve(idl_interface_t *intf)
+{
+	if(intf->resolved)
+	{
+		return 0;
+	}
+	if(intf->stub)
+	{
+		if(intf->target)
+		{
+			intf->resolved = 1;
+			return idl_intf_resolve(intf->target);
+		}
+		intf->target = idl_module_lookupintf(intf->name, 0);
+		if(!intf->target)
+		{
+			idl_module_errmsg(intf->module, 0, "unable to resolve interface '%s'\n", intf->name);
+			return -1;
+		}
+		intf->resolved = 1;
+		return 0;
+	}
+	if(intf->ancestor && intf->ancestor->stub)
+	{
+		if(idl_intf_resolve(intf->ancestor))
+		{
+			return -1;
+		}
+		intf->ancestor = intf->ancestor->target;
+	}
+	intf->resolved = 1;
+	return 0;
 }
 
 int
@@ -119,14 +163,14 @@ idl_intf_started(idl_interface_t *intf)
 	strcpy(sym->ident, intf->name);
 	idl_module_symdef_add(intf->module, &(intf->symlist), sym);
 	idl_module_typedecl_pop(intf->module);
-	idl_emit_intf_prologue(intf->module, intf);
 	return 0;
 }
 
 int
 idl_intf_finished(idl_interface_t *intf)
 {
-	idl_emit_intf_epilogue(intf->module, intf);
+	(void) intf;
+
 	return 0;
 }
 
@@ -256,25 +300,4 @@ idl_intf_method_inherited(idl_interface_t *intf, const char *methodname)
 		return 1;
 	}
 	return 0;
-}
-
-/* Write a local method declaration */
-int
-idl_intf_write_method(idl_interface_t *intf, idl_symdef_t *def)
-{
-	return idl_emit_local_method(intf->module, intf, def);
-}
-
-/* Write a typedef declaration */
-int
-idl_intf_write_typedef(idl_interface_t *intf, idl_symdef_t *symdef)
-{
-	return idl_emit_typedef(intf->module, intf, symdef);
-}
-
-/* Write a type definition (e.g., a struct) */
-int
-idl_intf_write_type(idl_interface_t *intf, idl_typedecl_t *decl)
-{
-	return idl_emit_type(intf->module, intf, decl);
 }

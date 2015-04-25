@@ -1,33 +1,16 @@
-/*
- * COM IDL Compiler
- * @(#) $Id$
- */
-
-/*
- * Copyright (c) 2008 Mo McRoberts.
+/* Copyright (c) 2008-2015 Mo McRoberts.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The names of the author(s) of this software may not be used to endorse
- *    or promote products derived from this software without specific prior
- *    written permission.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, 
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
- * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL
- * AUTHORS OF THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 #ifdef HAVE_CONFIG_H
@@ -63,12 +46,9 @@ usage(void)
 		"  -h                       Display this message and exit\n"
 		"  -X LANGUAGE              Output for LANGUAGE [default=C]\n"
 		"  -M MODE                  Specify default output mode: [default=com]\n"
-		"    com                      libCOM\n"
-		"    rpc                      libDCE-RPC\n"
+		"    talisker                 Talisker COM\n"
 		"    mscom                    Microsoft COM/ReactOS/WINE\n"
-		"    dcerpc                   DCE RPC/FreeDCE\n"
 		"    sunrpc                   Sun ONC RPC\n"
-		"    xpcom                    Mozilla XPCOM\n"
 		"  Note: specified mode value may be overridden within IDL\n",
 		progname);
 }
@@ -76,8 +56,8 @@ usage(void)
 static void
 version(void)
 {
-	fprintf(stderr, "@(#) $Id$\n\n");
-	fprintf(stderr, "Copyright (c) 2008 Mo McRoberts\n");
+	fprintf(stderr, "Talisker IDL compiler " PACKAGE " " VERSION "\n");
+	fprintf(stderr, "Copyright (c) 2008-2015 Mo McRoberts\n");
 	fprintf(stderr, "Copyright (c) 2007 Novell, Inc. All rights reserved.\n");
 	fprintf(stderr, "Copyright (c) 1989 Open Software Foundation, Inc.\n");
 	fprintf(stderr, "Copyright (c) 1989 Hewlett-Packard Company\n");
@@ -85,35 +65,22 @@ version(void)
 	#ifndef HAVE_GETOPT
 		fprintf(stderr, "Copyright (c) 1987, 1993, 1994\nThe Regents of the University of California.  All rights reserved.\n");
 	#endif
-	fprintf(stderr, "\nhttp://libcom.googlecode.com/\n");
 }
 
 idl_mode_t
 idl_mode_parse(const char *modestr)
 {
-	if(0 == strcmp(modestr, "com"))
+	if(0 == strcmp(modestr, "talisker"))
 	{
-		return MODE_COM;
-	}
-	if(0 == strcmp(modestr, "rpc"))
-	{
-		return MODE_RPC;
+		return MODE_TALISKER;
 	}
 	if(0 == strcmp(modestr, "mscom"))
 	{
 		return MODE_MSCOM;
 	}
-	if(0 == strcmp(modestr, "dcerpc"))
-	{
-		return MODE_DCERPC;
-	}
 	if(0 == strcmp(modestr, "sunrpc") || 0 == strcmp(modestr, "oncrpc"))
 	{
 		return MODE_SUNRPC;
-	}
-	if(0 == strcmp(modestr, "xpcom"))
-	{
-		return MODE_XPCOM;
 	}
 	return MODE_UNSPEC;
 }
@@ -144,6 +111,7 @@ idl_builtin(void)
 	
 	mod = idl_module_create("*Built-in*", NULL);
 	builtins = idl_intf_create(mod);
+	idl_builtin_create(mod, builtins, "bool", TYPE_BOOLEAN, TYPEMOD_NONE);
 	idl_builtin_create(mod, builtins, "int8_t", TYPE_INT8, TYPEMOD_SIGNED);
 	idl_builtin_create(mod, builtins, "int16_t", TYPE_INT16, TYPEMOD_SIGNED);
 	idl_builtin_create(mod, builtins, "int32_t", TYPE_INT32, TYPEMOD_SIGNED);
@@ -185,27 +153,29 @@ idl_parse(const char *src, const char *hout, int defimp, int useinc)
 		fprintf(stderr, "%s: %s: %s\n", progname, fpath, strerror(errno));
 		return -1;
 	}
-	if(1 == defimp && 0 == nodefimports)
-	{
-		if(-1 == idl_parse("nbase.idl", NULL, 0, 1))
-		{
-			fclose(f);
-			return -1;
-		}
-	}
 	if(NULL != idl_module_lookup(fpath))
 	{
-		fprintf(stderr, "%s has already been imported\n", fpath);
+		/*	fprintf(stderr, "%s has already been imported\n", fpath); */
 		return 0;
 	}
 	lastmod = curmod;
 	curmod = idl_module_create(fpath, hout);
+	if(!defimp)
+	{
+		curmod->nodefimports = 1;
+	}
+	if(!hout)
+	{
+		curmod->included = 1;
+	}
 	yylex_init(&scanner);
 	curmod->scanner = scanner;
 	yyrestart(f, scanner);
 	yyparse(scanner);
 	fclose(f);
 	idl_module_done(curmod);
+	curmod->included = 0;
+	curmod->emitter = NULL;
 	curmod->scanner = NULL;
 	curmod = lastmod;
 	return 0;
@@ -335,7 +305,7 @@ main(int argc, char **argv)
 	}
 	if(MODE_UNSPEC == defmode)
 	{
-		defmode = MODE_COM;
+		defmode = MODE_TALISKER;
 	}
 /*	idl_incpath_addincludedir("/usr/include");
 	idl_incpath_addframeworkdir("/System/Library/Frameworks");

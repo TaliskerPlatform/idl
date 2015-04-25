@@ -1,33 +1,16 @@
-/*
- * COM IDL Compiler
- * @(#) $Id$
- */
-
-/*
- * Copyright (c) 2008, 2009 Mo McRoberts.
+/* Copyright (c) 2008-2015 Mo McRoberts.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The names of the author(s) of this software may not be used to endorse
- *    or promote products derived from this software without specific prior
- *    written permission.
+ *  Licensed under the Apache License, Version 2.0 (the "License");
+ *  you may not use this file except in compliance with the License.
+ *  You may obtain a copy of the License at
  *
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, 
- * INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY 
- * AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL
- * AUTHORS OF THIS SOFTWARE BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF 
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING 
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an "AS IS" BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
  */
 
 #ifndef P_COMIDL_H_
@@ -64,13 +47,14 @@ extern int getopt(int argc, char * const argv[], const char *options);
 #  define YYSTYPE char *
 # endif
 
-#include "idlparse.h"
+# include "idlparse.h"
 
 typedef char idl_ident_t[64];
 
 # define IDL_IDENT_MAX (sizeof(idl_ident_t) - 1)
 
 typedef struct idl_module_struct idl_module_t;
+typedef struct idl_scope_struct idl_scope_t;
 typedef struct idl_interface_struct idl_interface_t;
 typedef struct idl_symlist_struct idl_symlist_t;
 typedef struct idl_symdef_struct idl_symdef_t;
@@ -87,7 +71,8 @@ typedef enum
 	MODE_MSCOM,
 	MODE_DCERPC,
 	MODE_SUNRPC,
-	MODE_XPCOM
+	MODE_XPCOM,
+	MODE_TALISKER
 } idl_mode_t;
 
 typedef enum
@@ -99,6 +84,14 @@ typedef enum
 	BLOCK_LIBRARY,
 	BLOCK_DISPINTERFACE
 } idl_containertype_t;
+
+typedef enum
+{
+	ST_MODULE,
+	ST_CONTAINER,
+	ST_SYMDEF,
+	ST_QUOTE
+} idl_scopetype_t;
 
 typedef enum
 {
@@ -206,8 +199,22 @@ struct idl_symlist_struct
 	size_t ndefs;
 };
 
+struct idl_scope_struct
+{
+	idl_scope_t *parent;
+	idl_scope_t *first, *last;
+	idl_scope_t *next;
+	idl_scopetype_t type;
+	idl_module_t *module;
+	int line;
+	idl_interface_t *container;
+	idl_symdef_t *symdef;
+	char *text;
+};
+
 struct idl_module_struct
 {
+	int included; /* if this is an imported module */
 	void *scanner;
 	char *filename; /* final filename, e.g., /Library/Frameworks/COM/Headers/wtypes.idl */
 	char *shortname; /* short filename, e.g., COM/wtypes.idl */
@@ -216,8 +223,10 @@ struct idl_module_struct
 	char *hmacro; /* e.g., COMIDL_WTYPES_H_ */
 	size_t houtdepth; /* indenting level */
 	idl_mode_t mode; /* output mode */
-	idl_guid_t const ** guids; /* GUIDs defined by this module */
+	idl_guid_t const **guids; /* GUIDs defined by this module */
 	size_t nguids;
+	idl_scope_t rootscope;
+	idl_scope_t *cur;
 	idl_interface_t **interfaces; /* interfaces defined by this module */
 	size_t ninterfaces;
 	idl_interface_t *curintf;
@@ -229,6 +238,7 @@ struct idl_module_struct
 	int nodefinc;
 	int nodefimports;
 	int headerwritten;
+	struct idl_emitter_struct *emitter;
 };
 
 struct idl_interface_struct
@@ -237,6 +247,7 @@ struct idl_interface_struct
 	idl_containertype_t type;
 	idl_guid_t uuid;
 	unsigned long version;
+	unsigned long id;
 	int local;
 	int object;
 	idl_ptrclass_t pointer_default;
@@ -245,6 +256,8 @@ struct idl_interface_struct
 	idl_symlist_t symlist;
 	idl_symlist_t *cursymlist;
 	idl_symdef_t *firstsym;
+	int stub, resolved;
+	idl_interface_t *target;
 };
 
 struct idl_symdef_struct
@@ -297,6 +310,18 @@ struct idl_expr_struct
 	idl_symdef_t *symdef;
 };
 
+struct idl_emitter_struct
+{
+	int (*init)(idl_module_t *module);
+	int (*done)(idl_module_t *module);
+	int (*intf_prologue)(idl_module_t *module, idl_interface_t *intf);
+	int (*intf_epilogue)(idl_module_t *module, idl_interface_t *intf);
+	int (*emit_cppquote)(idl_module_t *module, const char *quote);
+	int (*emit_typedef)(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
+	int (*emit_method)(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
+	int (*emit_const)(idl_module_t *module, idl_symdef_t *symdef);
+};
+
 extern idl_module_t *curmod;
 extern const char *progname;
 extern int nostdinc;
@@ -327,8 +352,12 @@ extern void idl_module_terminate(void);
 
 extern idl_module_t *idl_module_create(const char *filename, const char *hout);
 extern int idl_module_done(idl_module_t *module);
+
+extern idl_scope_t *idl_module_scope_push(idl_module_t *module);
+extern idl_scope_t *idl_module_scope_pop(idl_module_t *module);
+
 extern idl_module_t *idl_module_lookup(const char *pathname);
-extern idl_interface_t *idl_module_lookupintf(const char *name);
+extern idl_interface_t *idl_module_lookupintf(const char *name, int incstubs);
 extern int idl_module_addintf(idl_module_t *module, idl_interface_t *intf);
 extern int idl_module_doneintf(idl_module_t *module, idl_interface_t *intf);
 extern int idl_module_addguid(idl_module_t *module, const idl_guid_t *guid);
@@ -344,12 +373,14 @@ extern int idl_module_symlist_pop(idl_module_t *module, idl_symlist_t *symlist);
 extern int idl_module_set_mode(idl_module_t *module, int line, const char *mode);
 
 extern idl_interface_t *idl_intf_create(idl_module_t *module);
+extern idl_interface_t *idl_intf_stub(idl_module_t *module, const char *name);
 extern int idl_intf_done(idl_interface_t *intf);
 extern int idl_intf_uuid(idl_interface_t *intf, const char *uuid);
 extern int idl_intf_name(idl_interface_t *intf, const char *name);
 extern int idl_intf_started(idl_interface_t *intf);
 extern int idl_intf_finished(idl_interface_t *intf);
 extern idl_interface_t *idl_intf_lookup(const char *name);
+extern int idl_intf_resolve(idl_interface_t *intf);
 extern idl_symdef_t *idl_intf_symdef_create(idl_interface_t *intf, idl_typedecl_t *typedecl);
 extern int idl_intf_symdef_done(idl_interface_t *intf, idl_symdef_t *symdef);
 extern int idl_intf_symdef_link(idl_interface_t *intf, idl_symdef_t *symdef);
@@ -360,20 +391,16 @@ extern int idl_intf_method_exists(idl_interface_t *intf, const char *methodname)
 extern int idl_intf_method_exists_recurse(idl_interface_t *intf, const char *methodname);
 extern int idl_intf_method_inherited(idl_interface_t *intf, const char *methodname);
 
-extern int idl_intf_write_typedef(idl_interface_t *intf, idl_symdef_t *symdef);
-extern int idl_intf_write_method(idl_interface_t *intf, idl_symdef_t *symdef);
-extern int idl_intf_write_cppquote(idl_interface_t *intf, const char *s);
-extern int idl_intf_write_type(idl_interface_t *intf, idl_typedecl_t *decl);
+extern int idl_emit(idl_module_t *module);
 
-extern int idl_emit_init(idl_module_t *module);
-extern int idl_emit_done(idl_module_t *module);
-extern int idl_emit_cppquote(idl_module_t *module, const char *quote);
-extern int idl_emit_typedef(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
-extern int idl_emit_type(idl_module_t *module, idl_interface_t *intf, idl_typedecl_t *decl);
-extern int idl_emit_local_method(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
-extern int idl_emit_const(idl_module_t *module, idl_symdef_t *symdef);
-extern int idl_emit_intf_prologue(idl_module_t *module, idl_interface_t *intf);
-extern int idl_emit_intf_epilogue(idl_module_t *module, idl_interface_t *intf);
+/* C/C++ emitting helpers */
+extern int idl_emit_cxxinc_open(idl_module_t *module);
+extern void idl_emit_cxxinc_close(idl_module_t *module);
+extern void idl_emit_cxx_write_expr(idl_module_t *module, FILE *f, const idl_expr_t *expr);
+extern void idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_t *decl);
+extern void idl_emit_cxx_write_symdef(idl_module_t *module, FILE *f, idl_symdef_t *symdef, const char *fmt, const char *paramprefix, const char *voidstr);
+extern int idl_emit_cxx_write_sym(idl_module_t *module, FILE *f, idl_symdef_t *symdef, const char *fmt);
+extern void idl_emit_cxx_write_indent(idl_module_t *module, FILE *f);
 
 extern int idl_incpath_reset(void);
 extern int idl_incpath_add_includedir(const char *path);

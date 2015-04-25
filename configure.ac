@@ -45,6 +45,12 @@ AM_PROG_LEX
 AC_PROG_YACC
 AC_PROG_SED
 
+dnl Undo some effects of AM_MAINTAINER_MODE
+am__skiplex=''
+AC_SUBST([am__skiplex])
+am__skipyacc=''
+AC_SUBST([am__skipyacc])
+
 IDL_CPPFLAGS='-D_GNU_SOURCE -D_LARGEFILE_SOURCE -D_FILE_OFFSET_BITS=64'
 IDL_CC="$CC"
 if test x"${ac_cv_prog_gcc}" = x"yes" ; then
