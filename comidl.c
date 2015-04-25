@@ -168,7 +168,7 @@ idl_parse(const char *src, const char *hout, int defimp, int useinc)
 	}
 	if(!hout)
 	{
-		t = strchr(fpath, '/');
+		t = strrchr(fpath, '/');
 		if(t)
 		{
 			t++;
