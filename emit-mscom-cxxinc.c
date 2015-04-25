@@ -29,6 +29,7 @@ static int mscom_cxxinc_cppquote(idl_module_t *module, const char *quote);
 static int mscom_cxxinc_typedef(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
 static int mscom_cxxinc_method(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
 static int mscom_cxxinc_const(idl_module_t *module, idl_symdef_t *symdef);
+static int mscom_cxxinc_import(idl_module_t *module, idl_interface_t *intf);
 static void mscom_cxxinc_methods(idl_module_t *module, FILE *f, idl_interface_t *intf);
 static int mscom_cxxinc_method_macros(idl_module_t *module, FILE *f, idl_interface_t *curintf, idl_interface_t *intf, int written);
 
@@ -40,7 +41,8 @@ struct idl_emitter_struct idl_mscom_cxxinc_emitter = {
 	mscom_cxxinc_cppquote,
 	mscom_cxxinc_typedef,
 	mscom_cxxinc_method,
-	mscom_cxxinc_const
+	mscom_cxxinc_const,
+	mscom_cxxinc_import
 };
 
 
@@ -214,6 +216,17 @@ mscom_cxxinc_const(idl_module_t *module, idl_symdef_t *symdef)
 	fprintf(module->hout, "#  define %s ", symdef->ident);
 	idl_emit_cxx_write_expr(module, module->hout, symdef->constval);
 	fputc('\n', module->hout);
+	return 0;
+}
+
+static int
+mscom_cxxinc_import(idl_module_t *module, idl_interface_t *intf)
+{
+	if(!intf->cheader)
+	{
+		return 0;
+	}
+	fprintf(module->hout, "# include <%s>\n", intf->cheader);
 	return 0;
 }
 

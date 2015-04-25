@@ -127,10 +127,12 @@ int
 idl_parse(const char *src, const char *hout, int defimp, int useinc)
 {
 	FILE *f;
-	char fpath[PATH_MAX + 1];
+	char fpath[PATH_MAX + 1], *t;
 	idl_module_t *lastmod;
 	void *scanner;
-	
+	idl_scope_t *scope;
+	size_t c;
+
 	if(0 == useinc || src[0] == '/')
 	{
 		if(strlen(src) > PATH_MAX)
@@ -166,13 +168,47 @@ idl_parse(const char *src, const char *hout, int defimp, int useinc)
 	}
 	if(!hout)
 	{
+		t = strchr(fpath, '/');
+		if(t)
+		{
+			t++;
+		}
+		else
+		{
+			t = fpath;
+		}
 		curmod->included = 1;
+		curmod->houtname = (char *) malloc(strlen(t) + 3);
+		strcpy(curmod->houtname, t);
+		t = strrchr(curmod->houtname, '.');
+		if(t && !strcmp(t, ".idl"))
+		{
+			t[1] = 'h';
+			t[2] = 0;
+		}
+		else
+		{
+			strcat(curmod->houtname, ".h");
+		}
 	}
 	yylex_init(&scanner);
 	curmod->scanner = scanner;
 	yyrestart(f, scanner);
 	yyparse(scanner);
 	fclose(f);
+	if(lastmod && !lastmod->included)
+	{
+		for(c = 0; c < curmod->ninterfaces; c++)
+		{
+			if(!curmod->interfaces[c]->stub)
+			{
+				scope = idl_module_scope_push(lastmod);
+				scope->type = ST_IMPORT;
+				scope->container = curmod->interfaces[c];
+				idl_module_scope_pop(lastmod);
+			}
+		}
+	}
 	idl_module_done(curmod);
 	curmod->included = 0;
 	curmod->emitter = NULL;

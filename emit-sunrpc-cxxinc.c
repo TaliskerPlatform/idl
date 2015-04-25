@@ -27,6 +27,7 @@ static int sunrpc_cxxinc_cppquote(idl_module_t *module, const char *quote);
 static int sunrpc_cxxinc_typedef(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
 static int sunrpc_cxxinc_method(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
 static int sunrpc_cxxinc_const(idl_module_t *module, idl_symdef_t *symdef);
+static int sunrpc_cxxinc_import(idl_module_t *module, idl_interface_t *intf);
 
 struct idl_emitter_struct idl_sunrpc_cxxinc_emitter = {
 	sunrpc_cxxinc_init,
@@ -36,7 +37,8 @@ struct idl_emitter_struct idl_sunrpc_cxxinc_emitter = {
 	sunrpc_cxxinc_cppquote,
 	sunrpc_cxxinc_typedef,
 	sunrpc_cxxinc_method,
-	sunrpc_cxxinc_const
+	sunrpc_cxxinc_const,
+	sunrpc_cxxinc_import
 };
 
 
@@ -130,5 +132,16 @@ sunrpc_cxxinc_const(idl_module_t *module, idl_symdef_t *symdef)
 	idl_emit_cxx_write_expr(module, module->hout, symdef->constval);
 	fputc('\n', module->hout);
 
+	return 0;
+}
+
+static int
+sunrpc_cxxinc_import(idl_module_t *module, idl_interface_t *intf)
+{
+	if(!intf->cheader)
+	{
+		return 0;
+	}
+	fprintf(module->hout, "# include <%s>\n", intf->cheader);
 	return 0;
 }

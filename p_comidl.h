@@ -90,7 +90,8 @@ typedef enum
 	ST_MODULE,
 	ST_CONTAINER,
 	ST_SYMDEF,
-	ST_QUOTE
+	ST_QUOTE,
+	ST_IMPORT
 } idl_scopetype_t;
 
 typedef enum
@@ -258,6 +259,7 @@ struct idl_interface_struct
 	idl_symdef_t *firstsym;
 	int stub, resolved;
 	idl_interface_t *target;
+	char *cheader;
 };
 
 struct idl_symdef_struct
@@ -320,6 +322,7 @@ struct idl_emitter_struct
 	int (*emit_typedef)(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
 	int (*emit_method)(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
 	int (*emit_const)(idl_module_t *module, idl_symdef_t *symdef);
+	int (*emit_import)(idl_module_t *module, idl_interface_t *intf);
 };
 
 extern idl_module_t *curmod;
@@ -377,6 +380,7 @@ extern idl_interface_t *idl_intf_stub(idl_module_t *module, const char *name);
 extern int idl_intf_done(idl_interface_t *intf);
 extern int idl_intf_uuid(idl_interface_t *intf, const char *uuid);
 extern int idl_intf_name(idl_interface_t *intf, const char *name);
+extern int idl_intf_set_cheader(idl_interface_t *intf, const char *header);
 extern int idl_intf_started(idl_interface_t *intf);
 extern int idl_intf_finished(idl_interface_t *intf);
 extern idl_interface_t *idl_intf_lookup(const char *name);

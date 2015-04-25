@@ -30,6 +30,10 @@ idl_intf_create(idl_module_t *module)
 	}
 	p->cursymlist = &(p->symlist);
 	idl_module_addintf(module, p);
+	if(module->houtname)
+	{
+		idl_intf_set_cheader(p, module->houtname);
+	}
 	return p;
 }
 
@@ -213,6 +217,22 @@ idl_intf_name(idl_interface_t *intf, const char *name)
 			break;
 	}
 	strcat(intf->uuid.name, intf->name);
+	return 0;
+}
+
+int
+idl_intf_set_cheader(idl_interface_t *intf, const char *header)
+{
+	char *p;
+
+	p = strdup(header);
+	if(!p)
+	{
+		abort();
+	}
+	free(intf->cheader);
+	intf->cheader = p;
+
 	return 0;
 }
 

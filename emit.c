@@ -117,6 +117,8 @@ idl_emit_scope(idl_module_t *module, idl_scope_t *scope)
 		case SYM_STRUCT:
 			return 0;
 		}
+	case ST_IMPORT:
+		return module->emitter->emit_import(module, scope->container);
 	}
 
 	/* Iterate child scopes */
@@ -141,6 +143,8 @@ idl_emit_scope(idl_module_t *module, idl_scope_t *scope)
 	case ST_SYMDEF:
 		break;
 	case ST_QUOTE:
+		break;
+	case ST_IMPORT:
 		break;
 	}
 	return 0;

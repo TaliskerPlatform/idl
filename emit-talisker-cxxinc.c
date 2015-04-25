@@ -29,6 +29,7 @@ static int talisker_cxxinc_cppquote(idl_module_t *module, const char *quote);
 static int talisker_cxxinc_typedef(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
 static int talisker_cxxinc_method(idl_module_t *module, idl_interface_t *intf, idl_symdef_t *symdef);
 static int talisker_cxxinc_const(idl_module_t *module, idl_symdef_t *symdef);
+static int talisker_cxxinc_import(idl_module_t *module, idl_interface_t *intf);
 static void talisker_cxxinc_methods(idl_module_t *module, FILE *f, idl_interface_t *intf);
 static int talisker_cxxinc_method_macros(idl_module_t *module, FILE *f, idl_interface_t *curintf, idl_interface_t *intf, int written);
 
@@ -40,7 +41,8 @@ struct idl_emitter_struct idl_talisker_cxxinc_emitter = {
 	talisker_cxxinc_cppquote,
 	talisker_cxxinc_typedef,
 	talisker_cxxinc_method,
-	talisker_cxxinc_const
+	talisker_cxxinc_const,
+	talisker_cxxinc_import
 };
 
 
@@ -60,10 +62,7 @@ talisker_cxxinc_init(idl_module_t *module)
 		f = module->hout;
 		fprintf(f, "#ifndef %s_IDL_\n", module->hmacro);
 		fprintf(f, "# define %s_IDL_\n\n", module->hmacro);
-		if(!module->nodefinc)
-		{
-			fprintf(f, "# include <Talisker/Interfaces.h>\n\n");
-		}
+				
 		for(c = 0; c < module->ninterfaces; c++)
 		{
 			if(module->interfaces[c]->type == BLOCK_INTERFACE &&
@@ -203,6 +202,17 @@ talisker_cxxinc_const(idl_module_t *module, idl_symdef_t *symdef)
 	fprintf(module->hout, "#  define %s ", symdef->ident);
 	idl_emit_cxx_write_expr(module, module->hout, symdef->constval);
 	fputc('\n', module->hout);
+	return 0;
+}
+
+static int
+talisker_cxxinc_import(idl_module_t *module, idl_interface_t *intf)
+{
+	if(!intf->cheader)
+	{
+		return 0;
+	}
+	fprintf(module->hout, "# include <%s>\n", intf->cheader);
 	return 0;
 }
 

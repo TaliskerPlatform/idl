@@ -107,6 +107,7 @@ yyerror(void *scanner, char *s)
 %token CONTEXT_HANDLE_KW
 %token CPP_QUOTE_KW
 %token CSTRING_KW
+%token CHEADER_KW
 
 %token DEFAULT_KW
 %token DISPINTERFACE_KW
@@ -292,6 +293,7 @@ interface:
 interface_start:
 		interface_attributes INTERFACE_KW identifier
 		{
+			
 			curmod->curintf->type = BLOCK_INTERFACE;
 			/* TODO: name clashes */
 			idl_intf_name(curmod->curintf, $3);
@@ -316,6 +318,7 @@ identifier:
 	|	INOUT_KW { $$ = $1; }
     |   ID_KW { $$ = $1; }
     |   PTR_KW { $$ = $1; }
+    |   CHEADER_KW { $$ = $1; }
 	;
 
 interface_ancestor:
@@ -434,6 +437,10 @@ interface_attr:
         {
         	curmod->nodefinc = 1;
         }
+    |   CHEADER_KW LPAREN STRING RPAREN
+	    {
+		    idl_intf_set_cheader(curmod->curintf, $3);
+		}	   		
     ;
 
 pointer_class:
@@ -496,7 +503,6 @@ imports:
         import
     |   imports import
         {
-			fprintf(stderr, "Importing %s\n", $2);
         }
     ;
 

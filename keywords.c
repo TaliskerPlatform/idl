@@ -39,6 +39,7 @@ static struct idl_keyword_struct keywords[] =
 	{ "call_as", CALL_AS_KW },
 	{ "case", CASE_KW },
 	{ "char", CHAR_KW },
+	{ "cheader", CHEADER_KW }, /* Talisker */
 	{ "coclass", COCLASS_KW },
 	{ "const", CONST_KW },
 	{ "comm_status", COMM_STATUS_KW },
