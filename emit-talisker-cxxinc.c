@@ -230,21 +230,18 @@ talisker_cxxinc_consts(idl_module_t *module, FILE *f, idl_interface_t *container
 	}
 	if(started)
 	{
-		fputs("#  endif /*__cplusplus*/\n\n", f);
-	}
-	for(c = 0; c < container->symlist.ndefs; c++)
-	{
-		sym = container->symlist.defs[c];
-		if(sym->type == SYM_CONST)
+		fputs("\n#  else /*__cplusplus*/\n\n", f);
+		for(c = 0; c < container->symlist.ndefs; c++)
 		{
-			fprintf(f, "#  define %s ", sym->ident);
-			idl_emit_cxx_write_expr(module, f, sym->constval);
-			fputc('\n', f);
+			sym = container->symlist.defs[c];
+			if(sym->type == SYM_CONST)
+			{
+				fprintf(f, "#  define %s ", sym->ident);
+				idl_emit_cxx_write_expr(module, f, sym->constval);
+				fputc('\n', f);
+			}
 		}
-	}
-	if(started)
-	{
-		fputc('\n', f);
+		fputs("#  endif /*__cplusplus*/\n\n", f);
 	}
 	return 0;
 }
