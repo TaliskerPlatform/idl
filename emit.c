@@ -88,6 +88,7 @@ static int
 idl_emit_scope(idl_module_t *module, idl_scope_t *scope)
 {
 	idl_scope_t *p;
+	idl_interface_t *prevcontainer;
 
 	switch(scope->type)
 	{
@@ -96,8 +97,11 @@ idl_emit_scope(idl_module_t *module, idl_scope_t *scope)
 	case ST_QUOTE:
 		return module->emitter->emit_cppquote(module, scope->text);
 	case ST_CONTAINER:
+		prevcontainer = module->curintf;
+		module->curintf = scope->container;
 		if(module->emitter->intf_prologue(module, scope->container))
 		{
+			module->curintf = prevcontainer;
 			return -1;
 		}
 		break;
@@ -137,8 +141,10 @@ idl_emit_scope(idl_module_t *module, idl_scope_t *scope)
 	case ST_CONTAINER:
 		if(module->emitter->intf_epilogue(module, scope->container))
 		{
+			module->curintf = prevcontainer;
 			return -1;
 		}
+		module->curintf = prevcontainer;
 		break;
 	case ST_SYMDEF:
 		break;

@@ -405,6 +405,7 @@ extern void idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_
 extern void idl_emit_cxx_write_symdef(idl_module_t *module, FILE *f, idl_symdef_t *symdef, const char *fmt, const char *paramprefix, const char *voidstr);
 extern int idl_emit_cxx_write_sym(idl_module_t *module, FILE *f, idl_symdef_t *symdef, const char *fmt);
 extern void idl_emit_cxx_write_indent(idl_module_t *module, FILE *f);
+extern void idl_emit_cxx_builtin_type(FILE *f, idl_builtintype_t type, idl_typemod_t modifiers);
 
 extern int idl_incpath_reset(void);
 extern int idl_incpath_add_includedir(const char *path);

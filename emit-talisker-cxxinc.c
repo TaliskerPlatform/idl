@@ -32,6 +32,7 @@ static int talisker_cxxinc_const(idl_module_t *module, idl_symdef_t *symdef);
 static int talisker_cxxinc_import(idl_module_t *module, idl_interface_t *intf);
 static void talisker_cxxinc_methods(idl_module_t *module, FILE *f, idl_interface_t *intf);
 static int talisker_cxxinc_method_macros(idl_module_t *module, FILE *f, idl_interface_t *curintf, idl_interface_t *intf, int written);
+static int talisker_cxxinc_consts(idl_module_t *module, FILE *f, idl_interface_t *container);
 
 struct idl_emitter_struct idl_talisker_cxxinc_emitter = {
 	talisker_cxxinc_init,
@@ -60,20 +61,19 @@ talisker_cxxinc_init(idl_module_t *module)
 	{
 		module->headerwritten = 1;
 		f = module->hout;
-		fprintf(f, "#ifndef %s_IDL_\n", module->hmacro);
-		fprintf(f, "# define %s_IDL_\n\n", module->hmacro);
-				
 		for(c = 0; c < module->ninterfaces; c++)
 		{
 			if(module->interfaces[c]->type == BLOCK_INTERFACE &&
 				module->interfaces[c]->object)
 			{
-				fprintf(f, "# ifndef %s_FWD_DEFINED\n", module->interfaces[c]->name);
-				fprintf(f, "#  define %s_FWD_DEFINED\n", module->interfaces[c]->name);
+				fprintf(f, "#ifndef %s_FWD_DEFINED\n", module->interfaces[c]->name);
+				fprintf(f, "# define %s_FWD_DEFINED\n", module->interfaces[c]->name);
 				fprintf(f, "typedef struct %s %s;\n", module->interfaces[c]->name, module->interfaces[c]->name);
-				fprintf(f, "# endif\n\n");
+				fprintf(f, "#endif\n\n");
 			}
 		}
+		fprintf(f, "#ifndef %s_IDL_\n", module->hmacro);
+		fprintf(f, "# define %s_IDL_\n\n", module->hmacro);				
 	}
 	return 0;
 }
@@ -122,7 +122,6 @@ talisker_cxxinc_intf_prologue(idl_module_t *module, idl_interface_t *intf)
 	fprintf(f, "\n/* %s version %u.%u */\n\n", intf->name, major, minor);
 	fprintf(f, "# ifndef __%s_INTERFACE_DEFINED__\n", intf->name);
 	fprintf(f, "#  define __%s_INTERFACE_DEFINED__\n", intf->name);
-	fprintf(f, "#  define INTERFACE %s\n\n", intf->name);
 	return 0;
 }
 
@@ -135,6 +134,8 @@ talisker_cxxinc_intf_epilogue(idl_module_t *module, idl_interface_t *intf)
 
 	if(intf->object)
 	{
+		fprintf(f, "#  undef INTEFACE\n");
+		fprintf(f, "#  define INTERFACE %s\n\n", intf->name);
 		fputc('\n', f);
 		idl_emit_cxx_write_indent(module, f);
 		if(NULL == intf->ancestor)
@@ -149,6 +150,7 @@ talisker_cxxinc_intf_epilogue(idl_module_t *module, idl_interface_t *intf)
 		module->houtdepth++;
 		idl_emit_cxx_write_indent(module, f);
 		fprintf(f, "BEGIN_INTERFACE\n\n");
+		talisker_cxxinc_consts(module, f, intf);
 		talisker_cxxinc_methods(module, f, intf);
 		fputc('\n', f);
 		idl_emit_cxx_write_indent(module, f);
@@ -197,8 +199,63 @@ talisker_cxxinc_method(idl_module_t *module, idl_interface_t *intf, idl_symdef_t
 }
 
 static int
+talisker_cxxinc_consts(idl_module_t *module, FILE *f, idl_interface_t *container)
+{
+	size_t c;
+	int started;
+	idl_symdef_t *sym;
+
+	started = 0;
+
+	for(c = 0; c < container->symlist.ndefs; c++)
+	{
+		sym = container->symlist.defs[c];
+		if(sym->type == SYM_CONST)
+		{
+			if(!started)
+			{
+				fprintf(f, "#  ifdef (__cplusplus)\n");
+				started = 1;
+			}
+			idl_emit_cxx_write_indent(module, f);
+			fputs("static const ", f);
+			idl_emit_cxx_builtin_type(f, sym->const_type, 0);
+			putc(' ', f);
+			fputs(sym->ident, f);
+			fputs(" = ", f);
+			idl_emit_cxx_write_expr(module, f, sym->constval);
+			putc(';', f);
+			putc('\n', f);
+		}
+	}
+	if(started)
+	{
+		fputs("#  endif /*__cplusplus*/\n\n", f);
+	}
+	for(c = 0; c < container->symlist.ndefs; c++)
+	{
+		sym = container->symlist.defs[c];
+		if(sym->type == SYM_CONST)
+		{
+			fprintf(f, "#  define %s ", sym->ident);
+			idl_emit_cxx_write_expr(module, f, sym->constval);
+			fputc('\n', f);
+		}
+	}
+	if(started)
+	{
+		fputc('\n', f);
+	}
+	return 0;
+}
+
+static int
 talisker_cxxinc_const(idl_module_t *module, idl_symdef_t *symdef)
 {
+	if(module->curintf && module->curintf->object)
+	{
+		return 0;
+	}
 	fprintf(module->hout, "#  define %s ", symdef->ident);
 	idl_emit_cxx_write_expr(module, module->hout, symdef->constval);
 	fputc('\n', module->hout);

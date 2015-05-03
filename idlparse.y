@@ -627,7 +627,15 @@ const_type:
 		{
 			curmod->cursym->const_type = TYPE_INT16;
 		}
+	|	SHORT_KW
+		{
+			curmod->cursym->const_type = TYPE_INT16;
+		}
 	|	LONG_KW
+		{
+			curmod->cursym->const_type = TYPE_INT32;
+		}
+	|	INT_KW
 		{
 			curmod->cursym->const_type = TYPE_INT32;
 		}

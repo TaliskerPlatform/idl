@@ -112,37 +112,24 @@ idl_emit_cxx_write_expr(idl_module_t *module, FILE *f, const idl_expr_t *expr)
 	}
 }
 
-
 void
-idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_t *decl)
+idl_emit_cxx_builtin_type(FILE *f, idl_builtintype_t type, idl_typemod_t modifiers)
 {
-	size_t c;
-	
-	(void) module;
-	
-	if(NULL == decl || TYPE_NONE == decl->builtin_type)
+	if(type == TYPE_CHAR ||
+		type == TYPE_INT ||
+		type == TYPE_LONG ||
+		type == TYPE_LONGLONG)
 	{
-		return;
-	}
-	if(decl->modifiers & TYPEMOD_CONST)
-	{
-		fprintf(f, "const ");
-	}
-	if(decl->builtin_type == TYPE_CHAR ||
-		decl->builtin_type == TYPE_INT ||
-		decl->builtin_type == TYPE_LONG ||
-		decl->builtin_type == TYPE_LONGLONG)
-	{
-		if(decl->modifiers & TYPEMOD_UNSIGNED)
+		if(modifiers & TYPEMOD_UNSIGNED)
 		{
 			fprintf(f, "unsigned ");
 		}
-		else if(decl->modifiers & TYPEMOD_SIGNED)
+		else if(modifiers & TYPEMOD_SIGNED)
 		{
 			fprintf(f, "signed ");
 		}
 	}
-	switch(decl->builtin_type)
+	switch(type)
 	{
 		case TYPE_VOID:
 			fprintf(f, "void");
@@ -171,23 +158,8 @@ idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_t *decl)
 		case TYPE_BOOLEAN:
 			fprintf(f, "bool");
 			break;
-		case TYPE_STRUCT:
-			fprintf(f, "struct %s", decl->tag);
-			break;
-		case TYPE_UNION:
-			fprintf(f, "union %s", decl->tag);
-			break;
-		case TYPE_ENUM:
-			fprintf(f, "enum %s", decl->tag);
-			break;
-		case TYPE_INTERFACE:
-			fprintf(f, "cominterface %s", decl->tag);
-			break;
-		case TYPE_DEF:
-			fprintf(f, "%s", decl->user_type->ident);
-			break;
 		case TYPE_INT8:
-			if(decl->modifiers & TYPEMOD_UNSIGNED)
+			if(modifiers & TYPEMOD_UNSIGNED)
 			{
 				fprintf(f, "uint8_t");
 			}
@@ -197,7 +169,7 @@ idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_t *decl)
 			}
 			break;
 		case TYPE_INT16:
-			if(decl->modifiers & TYPEMOD_UNSIGNED)
+			if(modifiers & TYPEMOD_UNSIGNED)
 			{
 				fprintf(f, "uint16_t");
 			}
@@ -207,7 +179,7 @@ idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_t *decl)
 			}
 			break;
 		case TYPE_INT32:
-			if(decl->modifiers & TYPEMOD_UNSIGNED)
+			if(modifiers & TYPEMOD_UNSIGNED)
 			{
 				fprintf(f, "uint32_t");
 			}
@@ -217,7 +189,7 @@ idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_t *decl)
 			}
 			break;
 		case TYPE_INT64:
-			if(decl->modifiers & TYPEMOD_UNSIGNED)
+			if(modifiers & TYPEMOD_UNSIGNED)
 			{
 				fprintf(f, "uint64_t");
 			}
@@ -228,6 +200,43 @@ idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_t *decl)
 			break;
 		default:
 			break;
+	}
+}
+
+void
+idl_emit_cxx_write_type(idl_module_t *module, FILE *f, idl_typedecl_t *decl)
+{
+	size_t c;
+	
+	(void) module;
+	
+	if(NULL == decl || TYPE_NONE == decl->builtin_type)
+	{
+		return;
+	}
+	if(decl->modifiers & TYPEMOD_CONST)
+	{
+		fprintf(f, "const ");
+	}
+	switch(decl->builtin_type)
+	{
+	case TYPE_STRUCT:
+		fprintf(f, "struct %s", decl->tag);
+		break;
+	case TYPE_UNION:
+		fprintf(f, "union %s", decl->tag);
+		break;
+	case TYPE_ENUM:
+		fprintf(f, "enum %s", decl->tag);
+		break;
+	case TYPE_INTERFACE:
+		fprintf(f, "cominterface %s", decl->tag);
+		break;
+	case TYPE_DEF:
+		fprintf(f, "%s", decl->user_type->ident);
+		break;
+	default:
+		idl_emit_cxx_builtin_type(f, decl->builtin_type, decl->modifiers);
 	}
 	if(decl->has_symlist)
 	{
