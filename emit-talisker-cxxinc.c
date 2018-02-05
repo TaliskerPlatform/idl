@@ -73,7 +73,7 @@ talisker_cxxinc_init(idl_module_t *module)
 			}
 		}
 		fprintf(f, "#ifndef %s_IDL_\n", module->hmacro);
-		fprintf(f, "# define %s_IDL_\n\n", module->hmacro);				
+		fprintf(f, "# define %s_IDL_\n\n", module->hmacro);
 	}
 	return 0;
 }
@@ -83,29 +83,36 @@ talisker_cxxinc_done(idl_module_t *module)
 {
 	size_t c;
 
-	for(c = 0; c < module->nguids; c++)
+	fprintf(module->hout, "\n#endif /*!%s_IDL_*/\n\n", module->hmacro);
+
+	if(module->nguids)
 	{
-		fprintf(module->hout, "\n/* %s = {%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x} */\n",
-				module->guids[c]->name,
-				module->guids[c]->data1, module->guids[c]->data2, module->guids[c]->data3,
-				module->guids[c]->data4[0], module->guids[c]->data4[1],
-				module->guids[c]->data4[2], module->guids[c]->data4[3], module->guids[c]->data4[4],
-				module->guids[c]->data4[5], module->guids[c]->data4[6], module->guids[c]->data4[7]);
-		fprintf(module->hout, "UUID_DEFINE(%s, 0x%02x, 0x%02x, 0x%02x, 0x%02x,  0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x);\n",
-				module->guids[c]->name,
-				(module->guids[c]->data1 >> 24) & 0xff,
-				(module->guids[c]->data1 >> 16) & 0xff,
-				(module->guids[c]->data1 >> 8) & 0xff,
-				module->guids[c]->data1 & 0xff,
-				(module->guids[c]->data2 >> 8) & 0xff,
-				module->guids[c]->data2 & 0xff,
-				(module->guids[c]->data3 >> 8) & 0xff,
-				module->guids[c]->data3 & 0xff,
-				module->guids[c]->data4[0], module->guids[c]->data4[1],
-				module->guids[c]->data4[2], module->guids[c]->data4[3], module->guids[c]->data4[4],
-				module->guids[c]->data4[5], module->guids[c]->data4[6], module->guids[c]->data4[7]);
+		fprintf(module->hout, "#if defined(INITGUID) || !defined(%s_GUIDS_DEFINED_)\n", module->hmacro);
+		fprintf(module->hout, "# define %s_GUIDS_DEFINED_\n", module->hmacro);
+		for(c = 0; c < module->nguids; c++)
+		{
+			fprintf(module->hout, "\n/* %s = {%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x} */\n",
+					module->guids[c]->name,
+					module->guids[c]->data1, module->guids[c]->data2, module->guids[c]->data3,
+					module->guids[c]->data4[0], module->guids[c]->data4[1],
+					module->guids[c]->data4[2], module->guids[c]->data4[3], module->guids[c]->data4[4],
+					module->guids[c]->data4[5], module->guids[c]->data4[6], module->guids[c]->data4[7]);
+			fprintf(module->hout, "UUID_DEFINE(%s, 0x%02x, 0x%02x, 0x%02x, 0x%02x,  0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x, 0x%02x);\n",
+					module->guids[c]->name,
+					(module->guids[c]->data1 >> 24) & 0xff,
+					(module->guids[c]->data1 >> 16) & 0xff,
+					(module->guids[c]->data1 >> 8) & 0xff,
+					module->guids[c]->data1 & 0xff,
+					(module->guids[c]->data2 >> 8) & 0xff,
+					module->guids[c]->data2 & 0xff,
+					(module->guids[c]->data3 >> 8) & 0xff,
+					module->guids[c]->data3 & 0xff,
+					module->guids[c]->data4[0], module->guids[c]->data4[1],
+					module->guids[c]->data4[2], module->guids[c]->data4[3], module->guids[c]->data4[4],
+					module->guids[c]->data4[5], module->guids[c]->data4[6], module->guids[c]->data4[7]);
+		}
+		fprintf(module->hout, "#endif /*INITGUID || !%s_GUIDS_DEFINED_ */\n\n", module->hmacro);
 	}
-	fprintf(module->hout, "\n#endif /*!%s_IDL_*/\n", module->hmacro);
 	idl_emit_cxxinc_close(module);
 	return 0;
 }
