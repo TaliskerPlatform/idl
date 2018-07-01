@@ -1,0 +1,5 @@
+[local]
+interface Foo
+{
+	const int TEST = 47 * 32;
+}
